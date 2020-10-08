@@ -1,7 +1,6 @@
 package com.crushtech.cgpa.routes
 
 import com.crushtech.cgpa.data.*
-import com.crushtech.cgpa.data.collections.Courses
 import com.crushtech.cgpa.data.collections.Semester
 import com.crushtech.cgpa.data.collections.response.SimpleResponse
 import com.crushtech.cgpa.data.request.AddCourseRequest
@@ -143,7 +142,7 @@ fun Route.semesterRoute() {
                         OK,
                         SimpleResponse(
                             false,
-                            "This user is already an owner of this note"
+                            "This user is already an owner of this semester"
                         )
                     )
                     return@post
@@ -153,7 +152,7 @@ fun Route.semesterRoute() {
                         OK,
                         SimpleResponse(
                             true,
-                            "${request.owner} can now see this note"
+                            "${request.owner} can now see this semester"
                         )
                     )
                 }else{
