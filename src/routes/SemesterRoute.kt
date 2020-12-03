@@ -1,12 +1,12 @@
 package com.crushtech.cgpa.routes
 
+
 import com.crushtech.cgpa.data.*
 import com.crushtech.cgpa.data.collections.Semester
+import com.crushtech.cgpa.data.collections.UserPdfDownloads
 import com.crushtech.cgpa.data.collections.response.SimpleResponse
-import com.crushtech.cgpa.data.request.AddCourseRequest
-import com.crushtech.cgpa.data.request.AddOwnerRequest
-import com.crushtech.cgpa.data.request.DeleteCourseRequest
-import com.crushtech.cgpa.data.request.DeleteSemesterRequest
+import com.crushtech.cgpa.data.request.*
+import data.collections.GradeClass
 import io.ktor.application.call
 import io.ktor.auth.UserIdPrincipal
 import io.ktor.auth.authenticate
@@ -32,43 +32,93 @@ fun Route.semesterRoute() {
             }
         }
     }
+    route("/getUserGradePoints") {
+        authenticate {
+            get {
+                val email = call.principal<UserIdPrincipal>()!!.name
+                val gradePoints = getUserGradePointsPattern(email)
+                call.respond(OK, gradePoints)
+            }
+        }
+    }
 
-    route("/deleteSemester"){
+
+    route("/editUserGradePoints") {
         authenticate {
             post {
                 val email = call.principal<UserIdPrincipal>()!!.name
-                val request = try{
+                val request = try {
+                    call.receive<GradeClass>()
+                } catch (e: ContentTransformationException) {
+                    call.respond(BadRequest)
+                    return@post
+                }
+                if (upsertUserGradePointsPattern(request, email)) {
+                    call.respond(OK)
+                } else {
+                    call.respond(Conflict)
+                }
+            }
+        }
+    }
+
+
+    route("/resetUserGradePoints") {
+        authenticate {
+            post {
+                val email = call.principal<UserIdPrincipal>()!!.name
+                try {
+                    call.receive<GradeClass>()
+                } catch (e: ContentTransformationException) {
+                    call.respond(BadRequest)
+                    return@post
+                }
+                if (resetUserGradePointsPattern(email)) {
+                    val gradePoints = getUserGradePointsPattern(email)
+                    call.respond(OK, gradePoints)
+                } else {
+                    call.respond(Conflict)
+                }
+            }
+        }
+    }
+
+
+    route("/deleteSemester") {
+        authenticate {
+            post {
+                val email = call.principal<UserIdPrincipal>()!!.name
+                val request = try {
                     call.receive<DeleteSemesterRequest>()
 
                     //throw an error when content cannot be transformed to the desired type.
-                }catch (e:ContentTransformationException){
+                } catch (e: ContentTransformationException) {
                     call.respond(BadRequest)
                     return@post
                 }
-                if(deleteSemesterForSpecificUser(email,request.id)){
+                if (deleteSemesterForSpecificUser(email, request.id)) {
                     call.respond(OK)
-                }else{
+                } else {
                     call.respond(Conflict)
                 }
             }
         }
     }
 
-    route("/deleteCourse"){
+    route("/deleteCourse") {
         authenticate {
             post {
-               // val email = call.principal<UserIdPrincipal>()!!.name
-                val request = try{
+                val request = try {
                     call.receive<DeleteCourseRequest>()
 
                     //throw an error when content cannot be transformed to the desired type.
-                }catch (e:ContentTransformationException){
+                } catch (e: ContentTransformationException) {
                     call.respond(BadRequest)
                     return@post
                 }
-                if(deleteCourse(request.id,request.semesterId)){
+                if (deleteCourse(request.id, request.semesterId)) {
                     call.respond(OK)
-                }else{
+                } else {
                     call.respond(Conflict)
                 }
             }
@@ -76,34 +126,35 @@ fun Route.semesterRoute() {
     }
 
 
-    route("/addSemester"){
+    route("/addSemester") {
         authenticate {
             post {
-                val semester = try{
+                val semester = try {
                     call.receive<Semester>()
-                }catch (e:ContentTransformationException){
+                } catch (e: ContentTransformationException) {
                     call.respond(BadRequest)
                     return@post
                 }
-                if (saveSemester(semester)){
+                if (saveSemester(semester)) {
                     call.respond(OK)
-                }else{
+                } else {
                     call.respond(Conflict)
                 }
             }
         }
     }
 
-    route("/addCourseToSemester"){
+
+    route("/addCourseToSemester") {
         authenticate {
             post {
                 val request = try {
                     call.receive<AddCourseRequest>()
-                }catch (e:ContentTransformationException){
+                } catch (e: ContentTransformationException) {
                     call.respond(BadRequest)
                     return@post
                 }
-                if(addCourseToSemester(request.semesterId,request.course)){
+                if (addCourseToSemester(request.semesterId, request.course)) {
                     call.respond(
                         OK,
                         SimpleResponse(
@@ -111,23 +162,47 @@ fun Route.semesterRoute() {
                             "course added successfully"
                         )
                     )
-                }else{
+                } else {
                     call.respond(Conflict)
                 }
             }
         }
     }
 
-    route("/addOwnerToSemester"){
+    route("/updateAddedCourse") {
         authenticate {
             post {
-                val request = try{
-                    call.receive<AddOwnerRequest>()
-                }catch (e:ContentTransformationException){
+                val request = try {
+                    call.receive<updateCourseRequest>()
+                } catch (e: ContentTransformationException) {
                     call.respond(BadRequest)
                     return@post
                 }
-                if(!checkIfUserExists(request.owner)){
+                if (editAddedCourse(request.semesterId, request.course, request.coursePosition)) {
+                    call.respond(
+                        OK,
+                        SimpleResponse(
+                            true,
+                            "course updated"
+                        )
+                    )
+                } else {
+                    call.respond(Conflict)
+                }
+            }
+        }
+    }
+
+    route("/addOwnerToSemester") {
+        authenticate {
+            post {
+                val request = try {
+                    call.receive<AddOwnerRequest>()
+                } catch (e: ContentTransformationException) {
+                    call.respond(BadRequest)
+                    return@post
+                }
+                if (!checkIfUserExists(request.owner)) {
                     call.respond(
                         OK,
                         SimpleResponse(
@@ -137,7 +212,11 @@ fun Route.semesterRoute() {
                     )
                     return@post
                 }
-                if(isOwnerOfSemester(request.SemesterId,request.owner)){
+                if (isOwnerOfSemester(
+                        request.semesterId,
+                        request.owner
+                    )
+                ) {
                     call.respond(
                         OK,
                         SimpleResponse(
@@ -147,7 +226,7 @@ fun Route.semesterRoute() {
                     )
                     return@post
                 }
-                if (addOwnerToSemester(request.SemesterId,request.owner)){
+                if (addOwnerToSemester(request.semesterId, request.owner)) {
                     call.respond(
                         OK,
                         SimpleResponse(
@@ -155,7 +234,52 @@ fun Route.semesterRoute() {
                             "${request.owner} can now see this semester"
                         )
                     )
-                }else{
+                } else {
+                    call.respond(Conflict)
+                }
+            }
+        }
+    }
+
+    route("/getPdfDownloads") {
+        authenticate {
+            get {
+                val email = call.principal<UserIdPrincipal>()!!.name
+                val userPdfDownloads = checkUserPdfDownloads(email)
+                if (userPdfDownloads.noOfPdfDownloads <= 0) {
+                    call.respond(
+                        SimpleResponse(
+                            false,
+                            "you ran out of download coins,please purchase some"
+                        )
+                    )
+                } else {
+                    call.respond(OK, userPdfDownloads)
+                }
+            }
+        }
+    }
+
+    route("/addUserPdfDownloadsCount") {
+        authenticate {
+            post {
+                val email = call.principal<UserIdPrincipal>()!!.name
+                val request = try {
+                    call.receive<UserPdfDownloads>()
+                } catch (e: ContentTransformationException) {
+                    call.respond(BadRequest)
+                    return@post
+                }
+
+                if (upsertUserPdfDownloads(request, email)) {
+                    call.respond(
+                        OK,
+                        SimpleResponse(
+                            true,
+                            "successfully purchased"
+                        )
+                    )
+                } else {
                     call.respond(Conflict)
                 }
             }

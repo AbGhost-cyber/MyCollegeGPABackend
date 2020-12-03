@@ -39,11 +39,6 @@ val id:String = ObjectId().toString()
     }
 }
 
-fun getBestSemester(semester:List<Semester>):Semester?{
-    return  semester.maxBy {
-        it.getGPA()
-    }
-}
 fun getCGPA(semester:Triple<Semester,Semester,Semester>):Double{
     val firstSemesterGPA = semester.first.getGPA()
     val secondSemesterGPA = semester.second.getGPA()

@@ -29,13 +29,25 @@ fun Route.registerRoute() {
             //check if account exists already
             val userExist = checkIfUserExists(request.email)
             if (!userExist) {
-                if (registerUser(User(request.email, getHashWithSalt(request.password), request.username))) {
-                    call.respond(OK, SimpleResponse(true,
-                            "Account Created Successfully")
+                if (registerUser(
+                        User(
+                            request.email, getHashWithSalt(request.password),
+                            request.username, 0
+                        )
+                    )
+                ) {
+                    call.respond(
+                        OK, SimpleResponse(
+                            true,
+                            "Account Created Successfully"
+                        )
                     )
                 } else {
-                    call.respond(OK, SimpleResponse(
-                            false, "An unknown occurred"))
+                    call.respond(
+                        OK, SimpleResponse(
+                            false, "An unknown occurred"
+                        )
+                    )
                 }
             } else {
                 call.respond(OK, SimpleResponse(
