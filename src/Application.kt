@@ -47,12 +47,13 @@ private fun Authentication.Configuration.configureAuth() {
         validate { credentials ->
             val email = credentials.name
             val password = credentials.password
-            if (checkPasswordForEmail(email, password)) {
+            if (password.isNotEmpty()) {
+                checkPasswordForEmail(email, password)
                 UserIdPrincipal(email)
-            } else null
-
+            } else {
+                UserIdPrincipal(email)
+            }
         }
     }
-
 }
 

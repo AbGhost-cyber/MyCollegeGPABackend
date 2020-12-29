@@ -1,10 +1,13 @@
 package com.crushtech.cgpa.routes
 
-import com.crushtech.cgpa.data.checkIfUserExists
+import com.crushtech.cgpa.data.checkIfUserExistsInAllUsersCollections
+import com.crushtech.cgpa.data.collections.ThirdPartyLoginUser
 import com.crushtech.cgpa.data.collections.User
 import com.crushtech.cgpa.data.collections.response.SimpleResponse
+import com.crushtech.cgpa.data.registerThirdPartyLoginUser
 import com.crushtech.cgpa.data.registerUser
 import com.crushtech.cgpa.data.request.SignInRequest
+import com.crushtech.cgpa.data.request.ThirdPartyAuthRequest
 import com.crushtech.cgpa.security.getHashWithSalt
 import io.ktor.application.call
 import io.ktor.http.HttpStatusCode.Companion.BadRequest
@@ -27,7 +30,7 @@ fun Route.registerRoute() {
                 return@post
             }
             //check if account exists already
-            val userExist = checkIfUserExists(request.email)
+            val userExist = checkIfUserExistsInAllUsersCollections(request.email)
             if (!userExist) {
                 if (registerUser(
                         User(
@@ -50,8 +53,57 @@ fun Route.registerRoute() {
                     )
                 }
             } else {
-                call.respond(OK, SimpleResponse(
-                        false, "A user with that email already exists"))
+                call.respond(
+                    OK, SimpleResponse(
+                        false, "A user with that email already exists"
+                    )
+                )
+            }
+        }
+    }
+
+    route("/third_party_register") {
+        post {
+            val request = try {
+                call.receive<ThirdPartyAuthRequest>()
+            } catch (e: ContentTransformationException) {
+                call.respond(BadRequest)
+                return@post
+            }
+            //check if account exists already
+            val userExist = checkIfUserExistsInAllUsersCollections(
+                request.email
+            )
+            if (!userExist) {
+                if (
+                    registerThirdPartyLoginUser(
+                        ThirdPartyLoginUser(
+                            request.email,
+                            request.username, 0
+                        )
+                    )
+                ) {
+                    call.respond(
+                        OK, SimpleResponse(
+                            true,
+                            "Account Created Successfully"
+                        )
+                    )
+                } else {
+                    call.respond(
+                        OK, SimpleResponse(
+                            false, "An unknown occurred"
+                        )
+                    )
+                }
+
+            } else {
+                call.respond(
+                    OK, SimpleResponse(
+                        false,
+                        "A user with that email already exists, please log in"
+                    )
+                )
             }
         }
     }

@@ -1,12 +1,8 @@
 package com.crushtech.cgpa.data
 
 
-import com.crushtech.cgpa.data.collections.Courses
-import com.crushtech.cgpa.data.collections.Semester
-import com.crushtech.cgpa.data.collections.User
-import com.crushtech.cgpa.data.collections.UserPdfDownloads
+import com.crushtech.cgpa.data.collections.*
 import com.crushtech.cgpa.security.checkHashForPassword
-import com.mongodb.client.result.UpdateResult
 import data.collections.GradeClass
 import org.litote.kmongo.contains
 import org.litote.kmongo.coroutine.coroutine
@@ -18,15 +14,37 @@ private val client = KMongo.createClient().coroutine
 private val database = client.getDatabase("SemesterDatabase")
 private val users = database.getCollection<User>()
 private val semesters = database.getCollection<Semester>()
+private val thirdPartyLoginUsers = database.getCollection<ThirdPartyLoginUser>()
 
 
 suspend fun registerUser(user: User): Boolean {
     return users.insertOne(user).wasAcknowledged()
 }
 
-suspend fun checkIfUserExists(email: String): Boolean {
-    return users.findOne(User::email eq email) != null
+suspend fun registerThirdPartyLoginUser(thirdPartyLoginUser: ThirdPartyLoginUser): Boolean {
+    return thirdPartyLoginUsers.insertOne(thirdPartyLoginUser).wasAcknowledged()
 }
+
+
+suspend fun checkIfUserExistsInAllUsersCollections(email: String): Boolean {
+    return users.findOne(User::email eq email) != null || thirdPartyLoginUsers.findOne(
+        ThirdPartyLoginUser::email eq email
+    ) != null
+}
+
+suspend fun checkIfUserExistsInThirdPartyCollections(email: String): Boolean {
+    return thirdPartyLoginUsers.findOne(
+        ThirdPartyLoginUser::email eq email
+    ) != null
+}
+
+
+suspend fun checkIfUserExistsInBuC(email: String): Boolean {
+    return users.findOne(
+        User::email eq email
+    ) != null
+}
+
 
 suspend fun checkPasswordForEmail(email: String, passwordToCheck: String): Boolean {
     val actualPassword = users.findOne(User::email eq email)?.password ?: return false
@@ -34,7 +52,21 @@ suspend fun checkPasswordForEmail(email: String, passwordToCheck: String): Boole
 }
 
 suspend fun findUsernameWithEmail(email: String): String {
-    return users.findOne(User::email eq email)!!.username
+    val userExistInThirdParty = checkIfUserExistsInThirdPartyCollections(email)
+    val userExistsInBuc = checkIfUserExistsInBuC(email)
+    return when {
+        userExistInThirdParty -> {
+            thirdPartyLoginUsers.findOne(
+                ThirdPartyLoginUser::email eq email
+            )!!.username
+        }
+        userExistsInBuc -> {
+            users.findOne(
+                User::email eq email
+            )!!.username
+        }
+        else -> ""
+    }
 }
 
 suspend fun getSemesterForUser(email: String): List<Semester> {
@@ -54,69 +86,135 @@ suspend fun saveSemester(semester: Semester): Boolean {
 }
 
 suspend fun checkUserPdfDownloads(email: String): UserPdfDownloads {
-    val pdfDownloads = users.findOne(User::email eq email)!!.numbersOfPdfDownloads
-    return UserPdfDownloads(pdfDownloads)
+
+    val userExistInThirdParty = checkIfUserExistsInThirdPartyCollections(email)
+    val userExistsInBuc = checkIfUserExistsInBuC(email)
+
+    return when {
+        userExistInThirdParty -> {
+            val downloads = thirdPartyLoginUsers.findOne(
+                ThirdPartyLoginUser::email eq email
+            )!!.numbersOfPdfDownloads
+            UserPdfDownloads(downloads)
+        }
+        userExistsInBuc -> {
+            val downloads = users.findOne(
+                User::email eq email
+            )!!.numbersOfPdfDownloads
+            UserPdfDownloads(downloads)
+        }
+        else -> UserPdfDownloads()
+    }
 }
 
 suspend fun getUserGradePointsPattern(email: String): GradeClass {
-    return users.findOne(User::email eq email)!!.gradePoints
+    val userExistInThirdParty = checkIfUserExistsInThirdPartyCollections(email)
+    val userExistsInBuc = checkIfUserExistsInBuC(email)
+    return when {
+        userExistInThirdParty -> {
+            thirdPartyLoginUsers.findOne(
+                ThirdPartyLoginUser::email eq email
+            )!!.gradePoints
+        }
+        userExistsInBuc -> {
+            users.findOne(
+                User::email eq email
+            )!!.gradePoints
+        }
+        else -> GradeClass()
+    }
 }
 
 suspend fun upsertUserGradePointsPattern(gradePoints: GradeClass, email: String): Boolean {
-    val user = users.findOne(User::email eq email)
-    user?.let {
-        val updateResult: UpdateResult = if (checkIfUserExists(email)) {
-            users.updateOne(
+    val userExistInThirdParty = checkIfUserExistsInThirdPartyCollections(email)
+    val userExistsInBuc = checkIfUserExistsInBuC(email)
+
+    when {
+        userExistsInBuc -> {
+            val user = users.findOne(User::email eq email)!!
+            val updateResult = users.updateOne(
                 user::id eq user.id,
                 setValue(
                     User::gradePoints,
                     gradePoints
                 )
             )
-        } else {
-            UpdateResult.unacknowledged()
+            return updateResult.wasAcknowledged()
         }
-        return updateResult.wasAcknowledged()
-
-    } ?: return false
+        userExistInThirdParty -> {
+            val user = thirdPartyLoginUsers.findOne(ThirdPartyLoginUser::email eq email)!!
+            val updateResult = thirdPartyLoginUsers.updateOne(
+                user::id eq user.id,
+                setValue(
+                    ThirdPartyLoginUser::gradePoints,
+                    gradePoints
+                )
+            )
+            return updateResult.wasAcknowledged()
+        }
+    }
+    return false
 }
 
 suspend fun resetUserGradePointsPattern(email: String): Boolean {
-    val user = users.findOne(User::email eq email)
-    user?.let {
-        val updateResult: UpdateResult = if (checkIfUserExists(email)) {
-            users.updateOne(
+    val userExistInThirdParty = checkIfUserExistsInThirdPartyCollections(email)
+    val userExistsInBuc = checkIfUserExistsInBuC(email)
+    when {
+        userExistsInBuc -> {
+            val user = users.findOne(User::email eq email)!!
+            val updateResult = users.updateOne(
                 user::id eq user.id,
                 setValue(
                     User::gradePoints,
                     GradeClass()
                 )
             )
-        } else {
-            UpdateResult.unacknowledged()
+            return updateResult.wasAcknowledged()
         }
-        return updateResult.wasAcknowledged()
-
-    } ?: return false
+        userExistInThirdParty -> {
+            val user = thirdPartyLoginUsers.findOne(ThirdPartyLoginUser::email eq email)!!
+            val updateResult = thirdPartyLoginUsers.updateOne(
+                user::id eq user.id,
+                setValue(
+                    ThirdPartyLoginUser::gradePoints,
+                    GradeClass()
+                )
+            )
+            return updateResult.wasAcknowledged()
+        }
+    }
+    return false
 }
 
 suspend fun upsertUserPdfDownloads(userPdfDownloads: UserPdfDownloads, email: String): Boolean {
-    val user = users.findOne(User::email eq email)
-    user?.let {
-        val updateResult: UpdateResult = if (checkIfUserExists(email)) {
-            users.updateOne(
+    val userExistInThirdParty = checkIfUserExistsInThirdPartyCollections(email)
+    val userExistsInBuc = checkIfUserExistsInBuC(email)
+
+    when {
+        userExistsInBuc -> {
+            val user = users.findOne(User::email eq email)!!
+            val updateResult = users.updateOne(
                 user::id eq user.id,
                 setValue(
                     User::numbersOfPdfDownloads,
                     userPdfDownloads.noOfPdfDownloads
                 )
             )
-        } else {
-            UpdateResult.unacknowledged()
+            return updateResult.wasAcknowledged()
         }
-        return updateResult.wasAcknowledged()
-
-    } ?: return false
+        userExistInThirdParty -> {
+            val user = thirdPartyLoginUsers.findOne(ThirdPartyLoginUser::email eq email)!!
+            val updateResult = thirdPartyLoginUsers.updateOne(
+                user::id eq user.id,
+                setValue(
+                    ThirdPartyLoginUser::numbersOfPdfDownloads,
+                    userPdfDownloads.noOfPdfDownloads
+                )
+            )
+            return updateResult.wasAcknowledged()
+        }
+    }
+    return false
 }
 
 
@@ -204,5 +302,6 @@ suspend fun isOwnerOfSemester(semesterId: String, owner: String): Boolean {
     val semester = semesters.findOneById(semesterId) ?: return false
     return owner in semester.owners
 }
+
 
 

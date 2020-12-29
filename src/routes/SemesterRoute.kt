@@ -202,7 +202,7 @@ fun Route.semesterRoute() {
                     call.respond(BadRequest)
                     return@post
                 }
-                if (!checkIfUserExists(request.owner)) {
+                if (!checkIfUserExistsInAllUsersCollections(request.owner)) {
                     call.respond(
                         OK,
                         SimpleResponse(

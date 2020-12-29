@@ -13,3 +13,12 @@ data class User(
     @BsonId
     val id: String = ObjectId().toString()
 )
+
+data class ThirdPartyLoginUser(
+    val email: String,
+    val username: String,
+    val numbersOfPdfDownloads: Int,
+    val gradePoints: GradeClass = GradeClass(),
+    @BsonId
+    val id: String = ObjectId().toString()
+)
