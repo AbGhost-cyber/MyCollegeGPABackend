@@ -14,29 +14,70 @@ import io.ktor.features.ContentNegotiation
 import io.ktor.features.DefaultHeaders
 import io.ktor.gson.gson
 import io.ktor.routing.Routing
+import io.ktor.util.KtorExperimentalAPI
 
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
+//@KtorExperimentalAPI
+//fun main(args: Array<String>) {
+//    val server = embeddedServer(
+//        Netty,
+//        port = 8080,
+//        module = Application::module
+//    ).apply {
+//        start(wait = false)
+//    }
+
+//    runBlocking {
+//        val client = HttpClient(CIO) {
+//            install(JsonFeature) {
+//                serializer = GsonSerializer {
+//                    // .GsonBuilder
+//                    serializeNulls()
+//                    disableHtmlEscaping()
+//                }
+//            }
+//        }
+//
+//        val message = client.post<OneSignalConfig> {
+//            url("https://onesignal.com/api/v1/notifications/")
+//            contentType(ContentType.Application.Json)
+//            header("Authorization", "Basic NTY3Y2YwMWEtNTZmNi00Y2VjLThmYWUtODg5M2Q5ZDZkMDBh")
+//            body = OneSignalConfig(
+//                "ab830271-41ae-4e33-a673-23414a8c9ba2",
+//                contents = OneSignalConfig.Contents(en = "English Message"),
+//                headings = OneSignalConfig.Headings(en = "English Title"),
+//                channel_for_external_user_ids = "push",
+//                include_external_user_ids = listOf("xplendo@gmail.com")
+//            )
+//        }
+//
+//
+//        client.close()
+//       server.stop(300L, 300L, TimeUnit.SECONDS)
+//    }
+//}
+
+@KtorExperimentalAPI
 @Suppress("unused") // Referenced in application.conf
-@kotlin.jvm.JvmOverloads
-fun Application.module(testing: Boolean = false) {
+fun Application.module() {
     install(DefaultHeaders)
     install(CallLogging)
     install(ContentNegotiation) {
         gson {
             setPrettyPrinting()
         }
-
     }
 
-    install(Authentication){
+    install(Authentication) {
         configureAuth()
     }
-    install(Routing){
+    install(Routing) {
         registerRoute()
         loginRoute()
         semesterRoute()
     }
+
 
 }
 
@@ -56,4 +97,13 @@ private fun Authentication.Configuration.configureAuth() {
         }
     }
 }
+
+
+//data class Filters(
+//    val field: String,
+//    val key: String,
+//    val relation: String,
+//    val value: Int
+//)
+
 
